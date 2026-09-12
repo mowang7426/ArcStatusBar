@@ -69,11 +69,12 @@ cd ArcStatusBar
 make package
 ```
 
-生成 `packages/com.doubao.arcstatusbar_0.1.0_iphoneos-arm64.deb`。
+生成 `packages/com.doubao.arcstatusbar_0.1.0_iphoneos-arm64.deb`（`ARCHS=arm64 arm64e`，双架构）。
 
-> 若提示找不到 `libsubstrate.tbd`：Relaxin 基于 ellekit，可切换链接方式——
-> 编辑 `Makefile`，把 `ArcStatusBar_LIBRARIES = substrate` 改为
-> `ArcStatusBar_LIBRARIES = ellekit`（需先 `git clone https://github.com/theos/libellekit` 到 theos/lib）。
+> 本工程**不链接** substrate/ellekit 库（roothide/theos 的 lib/ 目录为空，写
+> `_LIBRARIES = ellekit` / `substrate` 会报 `ld: library ... not found`）。
+> Logos %hook 符号由 Relaxin 内的 ellekit 运行时在设备端解析——这是
+> roothide tweak 的标准写法（如 ssl-kill-switch3、liquidass）。
 
 ### 3. 安装到手机
 
