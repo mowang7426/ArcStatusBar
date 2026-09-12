@@ -2,5 +2,4 @@
 
 @interface ArcNetworkState : NSObject
 + (NSString *)radioLabel;
-+ (NSString *)signalVisual;
 @end
