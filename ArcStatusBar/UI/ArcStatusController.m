@@ -28,11 +28,15 @@
         // iOS 17 SDK's nullability/type checking. If SpringBoard has not
         // created an active window scene yet, retry on the next main-queue turn.
         if (!scene) {
-            scene = (UIWindowScene *)UIScreen.mainScreen.windowScene;
-        }
-
-        if (!scene) {
+            // NOTE: 原版用 UIScreen.mainScreen.windowScene 兜底, 但该属性是
+            // 私有 API, SDK 16.5 中未声明, 直接编译报错。改为延迟 0.5s 重试,
+            // SpringBoard 场景就绪后自动启动, 不依赖任何私有属性。
             self.running = NO;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                         (int64_t)(0.5 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [self start];
+            });
             return;
         }
 
