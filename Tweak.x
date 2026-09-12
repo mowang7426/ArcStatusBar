@@ -14,6 +14,13 @@ static const void *kSigKey  = &kSigKey;
 static const void *kWifiKey = &kWifiKey;
 static const void *kBatKey  = &kBatKey;
 
+// 私有类声明: 让编译器知道这些状态栏 item 类是 UIView 子类,
+// 否则无法访问 self.bounds / self.frame / self.tintColor 等属性
+// (不声明会报 "forward class object" 错误)
+@interface _UIStatusBarCellularSignalView : UIView @end
+@interface _UIStatusBarWifiSignalView : UIView @end
+@interface _UIStatusBarBatteryView : UIView @end
+
 // 记录最近一次创建的实例, 供 SpringBoard 启动动画使用
 static ASBDotSignalView  *gSigView;
 static ASBArcWifiView    *gWifiView;
