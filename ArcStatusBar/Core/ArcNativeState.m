@@ -1,21 +1,6 @@
 #import "ArcNativeState.h"
 #import <math.h>
 
-// 递归收集宿主树中所有原生图标视图 (信号/WiFi/电池/5G 可能在深层子视图)
-static void ASB_CollectTargets(UIView *root, NSMutableArray<UIView *> *outArr) {
-    for (UIView *v in root.subviews) {
-        NSString *cls = NSStringFromClass(v.class);
-        if ([cls containsString:@"Signal"] ||
-            [cls containsString:@"Wifi"] ||
-            [cls containsString:@"WiFi"] ||
-            [cls containsString:@"Battery"] ||
-            [cls containsString:@"NetworkType"]) {
-            [outArr addObject:v];
-        }
-        ASB_CollectTargets(v, outArr);
-    }
-}
-
 @implementation ArcNativeState
 
 + (instancetype)sharedState {
@@ -30,31 +15,50 @@ static void ASB_CollectTargets(UIView *root, NSMutableArray<UIView *> *outArr) {
     return state;
 }
 
-#pragma mark - 数据
+#pragma mark - 数据 (变更即重绘)
 
 - (void)setActiveBars:(NSInteger)activeBars {
-    _activeBars = activeBars;
-    [self setNeedsDisplay];
+    if (_activeBars != activeBars) {
+        _activeBars = activeBars;
+        [self setNeedsDisplay];
+    }
 }
 
 - (void)setChargePercent:(NSInteger)chargePercent {
-    _chargePercent = chargePercent;
-    [self setNeedsDisplay];
+    if (_chargePercent != chargePercent) {
+        _chargePercent = chargePercent;
+        [self setNeedsDisplay];
+    }
 }
 
 - (void)setCharging:(BOOL)charging {
-    _charging = charging;
+    if (_charging != charging) {
+        _charging = charging;
+        [self setNeedsDisplay];
+    }
+}
+
+#pragma mark - 位置记录 (由 frame setter hook 写入)
+
+- (void)setSignalFrame:(CGRect)signalFrame {
+    _signalFrame = signalFrame;
     [self setNeedsDisplay];
 }
 
-- (void)setNetworkUpdated:(BOOL)networkUpdated {
-    _networkUpdated = networkUpdated;
+- (void)setWifiFrame:(CGRect)wifiFrame {
+    _wifiFrame = wifiFrame;
+    [self setNeedsDisplay];
+}
+
+- (void)setBatteryFrame:(CGRect)batteryFrame {
+    _batteryFrame = batteryFrame;
     [self setNeedsDisplay];
 }
 
 #pragma mark - 挂载
 
 - (void)attachToHost:(UIView *)host {
+    if (!host) return;
     if (self.superview == host) {
         self.frame = host.bounds;
         return;
@@ -63,31 +67,29 @@ static void ASB_CollectTargets(UIView *root, NSMutableArray<UIView *> *outArr) {
     [host addSubview:self];
 }
 
-#pragma mark - 绘制 (CGContext, 原位)
+#pragma mark - 原位绘制 (CGContext)
 
 - (void)drawRect:(CGRect)rect {
     CGContextRef ctx = UIGraphicsGetCurrentContext();
     UIView *host = self.superview;
     if (!ctx || !host) return;
 
-    // 递归收集原生图标视图 (已隐藏, 仅用其 frame 定位), 按类名绘制
-    NSMutableArray<UIView *> *targets = [NSMutableArray array];
-    ASB_CollectTargets(host, targets);
+    // 优先用 frame setter 记录的精确位置; 未记录时回退到视图树转换
+    CGRect sf = [self resolvedFrameForView:self.signalView cached:self.signalFrame host:host];
+    CGRect wf = [self resolvedFrameForView:self.wifiView cached:self.wifiFrame host:host];
+    CGRect bf = [self resolvedFrameForView:self.batteryView cached:self.batteryFrame host:host];
 
-    for (UIView *v in targets) {
-        if (v == self) continue;
-        NSString *cls = NSStringFromClass(v.class);
-        CGRect f = [host convertRect:v.bounds fromView:v];
-        if (CGRectIsNull(f) || CGRectIsEmpty(f)) continue;
+    if (!CGRectIsEmpty(sf) && !CGRectIsNull(sf)) [self drawSignalDots:ctx frame:sf];
+    if (!CGRectIsEmpty(wf) && !CGRectIsNull(wf)) [self drawWifiArc:ctx frame:wf];
+    if (!CGRectIsEmpty(bf) && !CGRectIsNull(bf)) [self drawBattery:ctx frame:bf];
+}
 
-        if ([cls containsString:@"Signal"]) {
-            [self drawSignalDots:ctx frame:f];
-        } else if ([cls containsString:@"Wifi"] || [cls containsString:@"WiFi"]) {
-            [self drawWifiArc:ctx frame:f];
-        } else if ([cls containsString:@"Battery"]) {
-            [self drawBattery:ctx frame:f];
-        }
+- (CGRect)resolvedFrameForView:(UIView *)view cached:(CGRect)cached host:(UIView *)host {
+    if (view && view.superview) {
+        CGRect f = [host convertRect:view.bounds fromView:view];
+        if (!CGRectIsNull(f) && !CGRectIsEmpty(f)) return f;
     }
+    return cached;
 }
 
 // 信号: 4 个白点, 点亮数量 = activeBars
@@ -136,6 +138,7 @@ static void ASB_CollectTargets(UIView *root, NSMutableArray<UIView *> *outArr) {
     CGFloat top = CGRectGetMinY(f) + 2.0;
     CGFloat bottom = CGRectGetMaxY(f) - 2.0;
     CGFloat h = bottom - top;
+    if (h <= 0) return;
 
     // 外框细竖线
     CGContextSetStrokeColorWithColor(ctx, UIColor.whiteColor.CGColor);
