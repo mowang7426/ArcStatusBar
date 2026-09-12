@@ -1,4 +1,4 @@
-name: Build ArcStatusBar
+name: Build ArcStatusBar (roothide)
 
 on:
   workflow_dispatch:
@@ -10,27 +10,53 @@ jobs:
     runs-on: macos-14
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Install Theos
+      - name: Install dependencies
         run: |
-          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          brew install make dpkg ldid xz
 
-      - name: Install build tools
+      - name: Set THEOS
         run: |
-          brew install ldid dpkg
-          echo "$HOME/theos/bin" >> "$GITHUB_PATH"
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "THEOS_MAKE_PATH=$HOME/theos/makefiles" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: Build package
+      - name: Install RootHide Theos (fork)
         run: |
-          export THEOS="$HOME/theos"
-          make clean
-          make package FINALPACKAGE=1
+          rm -rf "$HOME/theos"
+          git clone --recursive https://github.com/roothide/theos.git "$HOME/theos"
+
+      - name: Install iPhoneOS 16.5 SDK
+        run: |
+          set -e
+          rm -rf /tmp/theos-sdks
+          mkdir -p "$HOME/theos/sdks"
+          git clone --depth=1 --filter=blob:none --sparse https://github.com/theos/sdks.git /tmp/theos-sdks
+          cd /tmp/theos-sdks
+          git sparse-checkout set iPhoneOS16.5.sdk
+          cp -R "iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
+
+      - name: Verify sources (确认编译的是最新代码)
+        run: |
+          set -e
+          echo "--- Makefile 关键行 ---"
+          grep -E "ARCHS|TARGET|SCHEME|SUBPROJECTS" Makefile
+          echo "--- 编译错误修复点 (必须含 isKindOfClass, 不含 anyObject 直赋) ---"
+          grep -n "isKindOfClass:UIWindowScene.class" ArcStatusBar/UI/ArcStatusController.m
+          grep -c "anyObject;" ArcStatusBar/UI/ArcStatusController.m || true
+          echo "--- control ---"
+          grep -E "^(Package|Version|Architecture|Depends)" control
+
+      - name: Build RootHide package
+        run: |
+          set -e
+          make clean || true
+          THEOS_PACKAGE_SCHEME=roothide make package FINALPACKAGE=1
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: ArcStatusBar-deb
+          name: ArcStatusBar-v2.1-deb
           path: packages/*.deb
-
