@@ -23,8 +23,12 @@ ArcStatusBar_FILES := \
 ArcStatusBar_CFLAGS := -fobjc-arc
 ArcStatusBar_FRAMEWORKS := UIKit CoreGraphics QuartzCore
 
-# 本版本 Tweak.xm 只用 %ctor 启动, 不 hook 任何方法, 不需要链接 substrate
-# (若以后加 %hook 再补 ArcStatusBar_LIBRARIES := substrate)
+# %hook 生成的 MSHookMessageEx 符号必须链接 substrate:
+# roothide/theos 在 roothide scheme 下自动转成
+# @loader_path/.jbroot/usr/lib/libsubstrate.dylib (由 ellekit 提供)。
+# 参考插件 CAiPhoneDuoStatus 的二进制依赖实证了这一点。
+# 缺失会导致链接失败或 dylib 符号不完整 -> 装上完全没效果。
+ArcStatusBar_LIBRARIES := substrate
 
 INSTALL_TARGET_PROCESSES := SpringBoard
 
