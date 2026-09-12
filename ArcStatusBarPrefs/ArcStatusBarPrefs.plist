@@ -1,0 +1,9 @@
+{
+    CFBundleIdentifier = "com.luochencustom.arcstatusbarprefs";
+    CFBundleName = "ArcStatusBarPrefs";
+    CFBundleDisplayName = "ArcStatusBar";
+    CFBundlePackageType = BNDL;
+    CFBundleShortVersionString = "2.1.0";
+    CFBundleVersion = "2.1.0";
+    NSPrincipalClass = "ArcStatusBarPrefs";
+}
