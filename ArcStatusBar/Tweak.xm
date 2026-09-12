@@ -1,16 +1,19 @@
 #import <UIKit/UIKit.h>
 #import "UI/ArcStatusController.h"
 
-%hook SpringBoard
+static ArcStatusController *gArcController = nil;
 
-- (void)applicationDidFinishLaunching:(id)application {
-    %orig;
+%ctor {
+    @autoreleasepool {
+        if (![[NSBundle mainBundle].bundleIdentifier isEqualToString:@"com.apple.springboard"]) {
+            return;
+        }
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                  (int64_t)(1.5 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        [[ArcStatusController sharedController] start];
-    });
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!gArcController) {
+                gArcController = [[ArcStatusController alloc] init];
+                [gArcController start];
+            }
+        });
+    }
 }
-
-%end

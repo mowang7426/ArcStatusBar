@@ -3,5 +3,5 @@
         Bundles = (
             "com.apple.springboard"
         );
-    }
+    };
 }
