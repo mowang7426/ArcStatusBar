@@ -126,7 +126,21 @@ static void ASB_OnNetType(UIView *self) {
     self.hidden = YES;
 }
 
-// 布局完成: 挂载 + 隐藏兜底 + 重绘
+// 递归隐藏宿主树中所有原生图标 (信号/WiFi/电池/5G 标签可能在深层子视图)
+static void ASB_HideTargets(UIView *root) {
+    for (UIView *v in root.subviews) {
+        NSString *c = NSStringFromClass(v.class);
+        if ([c containsString:@"Signal"] ||
+            [c containsString:@"Wifi"] ||
+            [c containsString:@"WiFi"] ||
+            [c containsString:@"Battery"] ||
+            [c containsString:@"NetworkType"]) {
+            v.hidden = YES;
+        }
+        ASB_HideTargets(v);
+    }
+}
+
 // 布局完成回调: 延迟到主队列下一轮再挂载/隐藏/重绘
 // 关键: 绝不在 setApplyingLayout: 调用栈内 addSubview/改 hidden,
 //       否则会触发布局重入 -> 控制中心卡死/SpringBoard 冻结
@@ -146,15 +160,8 @@ static void ASB_OnLayoutDone(UIView *fg) {
         UIView *host = weakFg;
         if (!host) return;
         [[ArcNativeState sharedState] attachToHost:host];
-        // 隐藏原生图标 (异步, 不在布局栈内)
-        for (UIView *v in host.subviews) {
-            NSString *c = NSStringFromClass(v.class);
-            if ([c containsString:@"Signal"] || [c containsString:@"Wifi"] ||
-                [c containsString:@"WiFi"] || [c containsString:@"Battery"] ||
-                [c containsString:@"NetworkType"]) {
-                v.hidden = YES;
-            }
-        }
+        // 递归隐藏全部原生图标 (异步, 不在布局栈内)
+        ASB_HideTargets(host);
         [[ArcNativeState sharedState] setNeedsDisplay];
     });
 }
