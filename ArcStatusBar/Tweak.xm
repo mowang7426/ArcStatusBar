@@ -153,6 +153,7 @@ static void ASB_OnLayoutDone(UIView *fg) {
     if (![done containsObject:key]) {
         [done addObject:key];
         NSLog(@"[ArcStatusBar] layoutDone %@", key);
+        ASB_ShowBanner([NSString stringWithFormat:@"ArcStatusBar hook ✓ %@", key]);
     }
 
     __weak UIView *weakFg = fg;
@@ -332,7 +333,35 @@ static void ASB_OnLayoutDone(UIView *fg) {
 %end
 
 // ---------------------------------------------------------------------------
-// 诊断: %ctor 检查目标类是否存在 + 控制中心收起刷新
+// 自检横幅: 装上后锁屏 3 秒内屏幕中央弹提示 = 插件已加载
+// 不弹 = dylib 未加载 (安装/编译问题), 一眼定位
+// ---------------------------------------------------------------------------
+static void ASB_ShowBanner(NSString *msg) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CGRect sb = [UIScreen mainScreen].bounds;
+        UIWindow *win = [[UIWindow alloc] initWithFrame:CGRectMake(0, 0, 320, 56)];
+        win.center = CGPointMake(CGRectGetMidX(sb), CGRectGetMidY(sb) - 120);
+        win.windowLevel = 2000.0;
+        win.backgroundColor = [UIColor colorWithWhite:0 alpha:0.88];
+        win.layer.cornerRadius = 14;
+        win.layer.masksToBounds = YES;
+        win.userInteractionEnabled = NO;
+        UILabel *l = [[UILabel alloc] initWithFrame:win.bounds];
+        l.text = msg;
+        l.textColor = UIColor.whiteColor;
+        l.textAlignment = NSTextAlignmentCenter;
+        l.font = [UIFont boldSystemFontOfSize:15];
+        [win addSubview:l];
+        win.hidden = NO;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            win.hidden = YES;
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// 诊断: %ctor 检查目标类是否存在 + 控制中心收起刷新 + 自检横幅
 // ---------------------------------------------------------------------------
 %ctor {
     @autoreleasepool {
@@ -360,5 +389,7 @@ static void ASB_OnLayoutDone(UIView *fg) {
                     usingBlock:^(NSNotification *note) {
             [[ArcNativeState sharedState] setNeedsDisplay];
         }];
+
+        ASB_ShowBanner(@"ArcStatusBar loaded ✓");
     }
 }
