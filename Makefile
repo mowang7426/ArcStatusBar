@@ -4,7 +4,9 @@
 # =============================================================================
 
 export ARCHS = arm64
-export TARGET = iphone:clang:16.0:14.0
+# 平台:编译器:SDK版本:部署版本 —— SDK 版本必须与 theos/sdks 仓库中实际存在的
+# iPhoneOS16.5.sdk 精确匹配 (仓库没有 16.0, 精确匹配会报错)
+export TARGET = iphone:clang:16.5:14.0
 
 # rootless (roothide) 打包方案: 安装到 /var/jb, 不碰系统分区
 export THEOS_PACKAGE_SCHEME = rootless
