@@ -42,7 +42,17 @@ iOS 13+ 的状态栏是 `_UIStatusBar` 架构（UIKitCore 私有框架），每�
 `CAShapeLayer` 视图 → 通过 KVC（`_signalStrengthBars` / `capacity`）同步真实
 信号强度与电量。未 hook 到（类名随 iOS 变化）时插件自动跳过，不影响系统。
 
-## 编译（在电脑上, macOS/Linux 均可）
+## 编译（GitHub Actions 自动构建, 推荐）
+
+把工程推到 GitHub 后, 仓库内置的 `.github/workflows/build.yml` 会在 macOS runner 上
+自动编译, 一次产出**两个包**:
+
+- `ArcStatusBar-rootless.deb` — 通用 rootless
+- `ArcStatusBar-roothide.deb` — **Relaxin / RootHide 环境装这个** (路径 /var/jb)
+
+去仓库 **Actions** 页 → 最新一次构建 → **Artifacts** 下载即可。
+
+## 编译（本地, macOS/Linux 均可）
 
 ### 1. 安装 theos
 

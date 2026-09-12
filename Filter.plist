@@ -6,7 +6,8 @@
 	<dict>
 		<key>Bundles</key>
 		<array>
-			<string>com.apple.UIKit</string>
+			<!-- 匹配进程主 Bundle: 桌面/锁屏状态栏由 SpringBoard 进程显示 -->
+			<string>com.apple.springboard</string>
 		</array>
 	</dict>
 </dict>
