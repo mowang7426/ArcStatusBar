@@ -94,8 +94,8 @@
 
 // 信号: 4 个白点, 点亮数量 = activeBars
 - (void)drawSignalDots:(CGContextRef)ctx frame:(CGRect)f {
-    CGFloat d = 3.4;
-    CGFloat spacing = 6.5;
+    CGFloat d = 4.2;
+    CGFloat spacing = 7.0;
     CGFloat cx = CGRectGetMinX(f) + d * 0.5;
     CGFloat cy = CGRectGetMidY(f);
 
@@ -103,21 +103,32 @@
         if (i < self.activeBars) {
             CGContextSetFillColorWithColor(ctx, UIColor.whiteColor.CGColor);
         } else {
+            // 未点亮: 灰色实心圆 (对齐参考效果)
             CGContextSetFillColorWithColor(ctx,
-                [UIColor.whiteColor colorWithAlphaComponent:0.22].CGColor);
+                [UIColor colorWithWhite:0.42 alpha:1.0].CGColor);
         }
         CGContextFillEllipseInRect(ctx,
             CGRectMake(cx + i * spacing - d * 0.5, cy - d * 0.5, d, d));
     }
 }
 
-// WiFi: 开口朝下的三弧 + 中心点
+// WiFi: 绿色霓虹大半弧环绕 + 白色 WiFi 图标 (三层弧 + 中心点)
 - (void)drawWifiArc:(CGContextRef)ctx frame:(CGRect)f {
+    CGPoint c = CGPointMake(CGRectGetMidX(f), CGRectGetMidY(f) + 1.0);
+
+    // 1) 外层: 亮绿色霓虹大弧 (开口朝下, 环绕大半圈)
+    CGContextSetStrokeColorWithColor(ctx,
+        [UIColor colorWithRed:0.15 green:1.0 blue:0.55 alpha:1.0].CGColor);
+    CGContextSetLineWidth(ctx, 2.6);
+    CGContextSetLineCap(ctx, kCGLineCapRound);
+    CGContextAddArc(ctx, c.x, c.y, 9.2,
+                    (CGFloat)(M_PI * 0.10), (CGFloat)(M_PI * 0.90), 0);
+    CGContextStrokePath(ctx);
+
+    // 2) 白色 WiFi 图标: 三层弧 + 底部小三角 + 中心点
     CGContextSetStrokeColorWithColor(ctx, UIColor.whiteColor.CGColor);
     CGContextSetLineWidth(ctx, 1.7);
     CGContextSetLineCap(ctx, kCGLineCapRound);
-
-    CGPoint c = CGPointMake(CGRectGetMidX(f), CGRectGetMidY(f) + 1.0);
 
     for (NSNumber *rv in @[@7.0, @4.6, @2.4]) {
         CGFloat r = rv.doubleValue;
@@ -126,8 +137,15 @@
         CGContextStrokePath(ctx);
     }
 
-    // 中心点
+    // 底部小三角 (WiFi 图标的地面)
     CGContextSetFillColorWithColor(ctx, UIColor.whiteColor.CGColor);
+    CGContextMoveToPoint(ctx, c.x - 2.4, c.y + 5.0);
+    CGContextAddLineToPoint(ctx, c.x + 2.4, c.y + 5.0);
+    CGContextAddLineToPoint(ctx, c.x, c.y + 8.6);
+    CGContextClosePath(ctx);
+    CGContextFillPath(ctx);
+
+    // 中心点
     CGContextFillEllipseInRect(ctx,
         CGRectMake(c.x - 1.2, c.y - 1.2, 2.4, 2.4));
 }
