@@ -127,18 +127,36 @@ static void ASB_OnNetType(UIView *self) {
 }
 
 // 布局完成: 挂载 + 隐藏兜底 + 重绘
+// 布局完成回调: 延迟到主队列下一轮再挂载/隐藏/重绘
+// 关键: 绝不在 setApplyingLayout: 调用栈内 addSubview/改 hidden,
+//       否则会触发布局重入 -> 控制中心卡死/SpringBoard 冻结
 static void ASB_OnLayoutDone(UIView *fg) {
-    ASB_LOG_HIT(NSStringFromClass(fg.class));
-    [[ArcNativeState sharedState] attachToHost:fg];
-    for (UIView *v in fg.subviews) {
-        NSString *c = NSStringFromClass(v.class);
-        if ([c containsString:@"Signal"] || [c containsString:@"Wifi"] ||
-            [c containsString:@"WiFi"] || [c containsString:@"Battery"] ||
-            [c containsString:@"NetworkType"]) {
-            v.hidden = YES;
-        }
+    static NSMutableSet *done;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ done = [NSMutableSet set]; });
+
+    NSString *key = NSStringFromClass(fg.class);
+    if (![done containsObject:key]) {
+        [done addObject:key];
+        NSLog(@"[ArcStatusBar] layoutDone %@", key);
     }
-    [[ArcNativeState sharedState] setNeedsDisplay];
+
+    __weak UIView *weakFg = fg;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *host = weakFg;
+        if (!host) return;
+        [[ArcNativeState sharedState] attachToHost:host];
+        // 隐藏原生图标 (异步, 不在布局栈内)
+        for (UIView *v in host.subviews) {
+            NSString *c = NSStringFromClass(v.class);
+            if ([c containsString:@"Signal"] || [c containsString:@"Wifi"] ||
+                [c containsString:@"WiFi"] || [c containsString:@"Battery"] ||
+                [c containsString:@"NetworkType"]) {
+                v.hidden = YES;
+            }
+        }
+        [[ArcNativeState sharedState] setNeedsDisplay];
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +303,8 @@ static void ASB_OnLayoutDone(UIView *fg) {
 %end
 
 // ---------------------------------------------------------------------------
-// Hook: ForegroundView (布局完成 -> 挂载 / 隐藏 / 重绘)
+// Hook: ForegroundView (布局完成 -> 异步挂载 / 隐藏 / 重绘)
+// 只 hook setApplyingLayout: (对齐参考插件), 不 hook layoutSubviews
 // ---------------------------------------------------------------------------
 %hook _UIStatusBarForegroundView
 - (void)setApplyingLayout:(BOOL)applying {
@@ -293,11 +312,6 @@ static void ASB_OnLayoutDone(UIView *fg) {
     if (!applying) {
         ASB_OnLayoutDone(self);
     }
-}
-- (void)layoutSubviews {
-    %orig;
-    [[ArcNativeState sharedState] attachToHost:self];
-    [[ArcNativeState sharedState] setNeedsDisplay];
 }
 %end
 
@@ -307,11 +321,6 @@ static void ASB_OnLayoutDone(UIView *fg) {
     if (!applying) {
         ASB_OnLayoutDone(self);
     }
-}
-- (void)layoutSubviews {
-    %orig;
-    [[ArcNativeState sharedState] attachToHost:self];
-    [[ArcNativeState sharedState] setNeedsDisplay];
 }
 %end
 
