@@ -43,9 +43,12 @@ jobs:
           set -e
           echo "--- Makefile 关键行 ---"
           grep -E "ARCHS|TARGET|SCHEME|SUBPROJECTS" Makefile
-          echo "--- 编译错误修复点 (必须含 isKindOfClass, 不含 anyObject 直赋) ---"
+          echo "--- 编译错误修复点 1 (必须含 isKindOfClass, 不含 anyObject 直赋) ---"
           grep -n "isKindOfClass:UIWindowScene.class" ArcStatusBar/UI/ArcStatusController.m
           grep -c "anyObject;" ArcStatusBar/UI/ArcStatusController.m || true
+          echo "--- 编译错误修复点 2 (不得有 UIScreen windowScene 赋值代码) ---"
+          grep -n "scene = (UIWindowScene \*)UIScreen" ArcStatusBar/UI/ArcStatusController.m || echo "OK: 私有属性赋值已清除"
+          grep -n "dispatch_after" ArcStatusBar/UI/ArcStatusController.m
           echo "--- control ---"
           grep -E "^(Package|Version|Architecture|Depends)" control
 
