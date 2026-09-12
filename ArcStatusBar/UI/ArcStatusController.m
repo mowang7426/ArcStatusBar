@@ -24,11 +24,19 @@
             }
         }
 
+        // Do not assign `anyObject` directly to UIWindowScene under the
+        // iOS 17 SDK's nullability/type checking. If SpringBoard has not
+        // created an active window scene yet, retry on the next main-queue turn.
         if (!scene) {
-            scene = UIApplication.sharedApplication.connectedScenes.anyObject;
+            scene = (UIWindowScene *)UIScreen.mainScreen.windowScene;
         }
 
-        CGRect bounds = scene ? scene.coordinateSpace.bounds : UIScreen.mainScreen.bounds;
+        if (!scene) {
+            self.running = NO;
+            return;
+        }
+
+        CGRect bounds = scene.coordinateSpace.bounds;
 
         self.window = [[UIWindow alloc] initWithWindowScene:scene];
         self.window.frame = CGRectMake(0, 0, CGRectGetWidth(bounds), 58.0);
