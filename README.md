@@ -30,17 +30,22 @@ ArcStatusBar/
 ## 工作原理
 
 iOS 13+ 的状态栏是 `_UIStatusBar` 架构（UIKitCore 私有框架），每个图标是一个
-`_UIStatusBarItemView` 子类：
+`_UIStatusBarItemView` 子类。**iOS 17 起状态栏整体改名为 `STUIStatusBar*` 系列**
+（参考已上架 roothide 的同类插件 CAiPhoneDuoStatus 的类名实证），电池类则一直
+是 `_UIBatteryView` / `_UIStaticBatteryView`（iOS 17 为 `STUIStatusBarStaticBatteryView`）。
+本插件对**两套类都 hook**（哪个存在哪个生效，互不干扰）：
 
-| 原生类 | 作用 | 本插件替换为 |
+| 原生类（iOS 16 / iOS 17） | 作用 | 本插件替换为 |
 |---|---|---|
-| `_UIStatusBarCellularSignalView` | 蜂窝信号 | `ASBDotSignalView`（4 点） |
-| `_UIStatusBarWifiSignalView` | WiFi | `ASBArcWifiView`（弧形+点） |
-| `_UIStatusBarBatteryView` | 电池 | `ASBLineBatteryView`（竖线） |
+| `_UIStatusBarCellularSignalView` / `STUIStatusBarCellularSignalView` | 蜂窝信号 | `ASBDotSignalView`（4 点） |
+| `_UIStatusBarWifiSignalView` / `STUIStatusBarWifiSignalView` | WiFi | `ASBArcWifiView`（弧形+点） |
+| `_UIBatteryView` `_UIStaticBatteryView` / `STUIStatusBarStaticBatteryView` | 电池 | `ASBLineBatteryView`（竖线） |
 
-做法：hook 上述三个类的 `layoutSubviews` → 隐藏原生图标层 → 挂上自定义
-`CAShapeLayer` 视图 → 通过 KVC（`_signalStrengthBars` / `capacity`）同步真实
-信号强度与电量。未 hook 到（类名随 iOS 变化）时插件自动跳过，不影响系统。
+做法：hook 上述类的 `layoutSubviews` → 隐藏原生图标层 → 挂上自定义
+`CAShapeLayer` 视图 → 通过 KVC 多 key（`numberOfActiveBars` / `_signalStrengthBars`，
+`chargePercent` / `capacity`）同步真实信号强度与电量；并 hook
+`STUIStatusBarForegroundView` / `_UIStatusBarForegroundView` 的 `setApplyingLayout:`
+做布局完成后的刷新兜底。未 hook 到（类名随 iOS 变化）时插件自动跳过，不影响系统。
 
 ## 编译（GitHub Actions 自动构建, 推荐）
 
@@ -89,9 +94,9 @@ make package install     # 需先 export THEOS_DEVICE_IP=手机IP, THEOS_DEVICE_
 - 卸载: Sileo 中移除 ArcStatusBar 即可。
 - 日志: 设备上 `log stream --predicate 'process == "SpringBoard"'` 或
   安装 `oslog` 查看。
-- 若图标没有变化：用 **FLEX** / `cycript` 检查真实类名是否仍是
-  `_UIStatusBarCellularSignalView` 等（iOS 17 个别版本可能改名），改 `Tweak.x`
-  中的 hook 类名即可。
+- 若图标没有变化：用 **FLEX** / `cycript` 检查真实类名（iOS 17 上应为
+  `STUIStatusBarCellularSignalView` 等），对比 `Tweak.x` 中的 hook 类名；
+  也可在设备日志里 grep `ArcStatusBar` 看注入是否成功（Sileo 安装后需 respring）。
 
 ## 自定义
 
