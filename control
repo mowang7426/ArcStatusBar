@@ -1,0 +1,10 @@
+Package: com.luochencustom.arcstatusbar
+Name: ArcStatusBar
+Version: 2.0.0
+Architecture: iphoneos-arm64
+Description: Morphing arc-style status bar prototype for iOS 17.
+Maintainer: Luochencustom
+Author: Luochencustom
+Section: Tweaks
+Priority: optional
+Depends: firmware (>= 17.0)
