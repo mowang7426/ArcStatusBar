@@ -79,53 +79,6 @@ static void ASB_LOG_HIT(NSString *what) {
     }
 }
 
-static void ASB_OnSignalBars(UIView *self, NSInteger bars) {
-    ASB_LOG_HIT(NSStringFromClass(self.class));
-    [ArcNativeState sharedState].activeBars = bars;
-    self.hidden = YES;
-}
-
-static void ASB_OnSignalData(UIView *self) {
-    self.hidden = YES;
-}
-
-static void ASB_OnSignalFrame(UIView *self, CGRect f) {
-    [ArcNativeState sharedState].signalView = self;
-    [ArcNativeState sharedState].signalFrame = f;
-}
-
-static void ASB_OnWifiData(UIView *self) {
-    self.hidden = YES;
-}
-
-static void ASB_OnWifiFrame(UIView *self, CGRect f) {
-    [ArcNativeState sharedState].wifiView = self;
-    [ArcNativeState sharedState].wifiFrame = f;
-}
-
-static void ASB_OnBatteryData(UIView *self) {
-    self.hidden = YES;
-}
-
-static void ASB_OnChargePercent(UIView *self, CGFloat percent) {
-    ASB_LOG_HIT(NSStringFromClass(self.class));
-    [ArcNativeState sharedState].chargePercent = (NSInteger)percent;
-    self.hidden = YES;
-}
-
-static void ASB_OnChargingState(NSInteger state) {
-    [ArcNativeState sharedState].charging = (state != 0);
-}
-
-static void ASB_OnBatteryFrame(UIView *self, CGRect f) {
-    [ArcNativeState sharedState].batteryView = self;
-    [ArcNativeState sharedState].batteryFrame = f;
-}
-
-static void ASB_OnNetType(UIView *self) {
-    self.hidden = YES;
-}
-
 // 递归隐藏宿主树中所有原生图标 (信号/WiFi/电池/5G 标签可能在深层子视图)
 static void ASB_HideTargets(UIView *root) {
     for (UIView *v in root.subviews) {
@@ -139,6 +92,90 @@ static void ASB_HideTargets(UIView *root) {
         }
         ASB_HideTargets(v);
     }
+}
+
+// 向上找状态栏根容器 (含 StatusBar 且非 Foreground/Item 的视图)
+static UIView *ASB_FindStatusBarContainer(UIView *v) {
+    UIView *cur = v;
+    UIView *last = v;
+    while (cur) {
+        NSString *c = NSStringFromClass(cur.class);
+        if ([c containsString:@"StatusBar"] &&
+            ![c containsString:@"Foreground"] &&
+            ![c containsString:@"Item"]) {
+            return cur;
+        }
+        last = cur;
+        cur = cur.superview;
+    }
+    return last;
+}
+
+// 挂载 + 递归隐藏 + 重绘 (异步, 不在 setter 调用栈内动视图层级)
+static void ASB_EnsureMounted(UIView *v) {
+    __weak UIView *weakV = v;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *vv = weakV;
+        if (!vv || !vv.superview) return;
+        UIView *host = ASB_FindStatusBarContainer(vv);
+        if (!host) return;
+        [[ArcNativeState sharedState] attachToHost:host];
+        ASB_HideTargets(host);
+        [[ArcNativeState sharedState] setNeedsDisplay];
+    });
+}
+
+static void ASB_OnSignalBars(UIView *self, NSInteger bars) {
+    ASB_LOG_HIT(NSStringFromClass(self.class));
+    [ArcNativeState sharedState].activeBars = bars;
+    self.hidden = YES;
+    ASB_EnsureMounted(self);
+}
+
+static void ASB_OnSignalData(UIView *self) {
+    self.hidden = YES;
+    ASB_EnsureMounted(self);
+}
+
+static void ASB_OnSignalFrame(UIView *self, CGRect f) {
+    [ArcNativeState sharedState].signalView = self;
+    [ArcNativeState sharedState].signalFrame = f;
+}
+
+static void ASB_OnWifiData(UIView *self) {
+    self.hidden = YES;
+    ASB_EnsureMounted(self);
+}
+
+static void ASB_OnWifiFrame(UIView *self, CGRect f) {
+    [ArcNativeState sharedState].wifiView = self;
+    [ArcNativeState sharedState].wifiFrame = f;
+}
+
+static void ASB_OnBatteryData(UIView *self) {
+    self.hidden = YES;
+    ASB_EnsureMounted(self);
+}
+
+static void ASB_OnChargePercent(UIView *self, CGFloat percent) {
+    ASB_LOG_HIT(NSStringFromClass(self.class));
+    [ArcNativeState sharedState].chargePercent = (NSInteger)percent;
+    self.hidden = YES;
+    ASB_EnsureMounted(self);
+}
+
+static void ASB_OnChargingState(NSInteger state) {
+    [ArcNativeState sharedState].charging = (state != 0);
+}
+
+static void ASB_OnBatteryFrame(UIView *self, CGRect f) {
+    [ArcNativeState sharedState].batteryView = self;
+    [ArcNativeState sharedState].batteryFrame = f;
+}
+
+static void ASB_OnNetType(UIView *self) {
+    self.hidden = YES;
+    ASB_EnsureMounted(self);
 }
 
 // 布局完成回调: 延迟到主队列下一轮再挂载/隐藏/重绘
