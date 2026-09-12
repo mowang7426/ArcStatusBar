@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang make git
+          sudo apt-get install -y build-essential fakeroot rsync curl perl zip git libxml2 libtinfo6
           # theos 在 Linux 上打包需要 ldid (Procursus 版, 支持 arm64e 签名)
           curl -sL https://github.com/ProcursusTeam/ldid/releases/latest/download/ldid_linux_x86_64 -o /usr/local/bin/ldid
           chmod +x /usr/local/bin/ldid
@@ -28,9 +28,10 @@ jobs:
       - name: Setup theos
         run: |
           git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          # Linux 交叉编译工具链 (theos 官方 install-theos 同源, 提供
-          # toolchain/linux/iphone/bin/clang); 不装会报 clang: No such file
-          curl -sL https://github.com/kabiroberai/swift-toolchain-linux/releases/download/v2.3.0/swift-5.8-ubuntu20.04.tar.xz | tar -xJvf - -C "$HOME/theos" /toolchain/
+          # Linux iOS 交叉工具链 (theos 官方 install-theos 同源, 非 Swift 版;
+          # 解压到 $THEOS/toolchain/, 包内顶层是 linux/)
+          curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz | tar -xJvf - -C "$HOME/theos/toolchain/"
+          test -x "$HOME/theos/toolchain/linux/iphone/bin/clang" && echo "toolchain OK" || (echo "toolchain FAILED"; exit 7)
           # theos 自带一个空的 sdks 目录, 必须先移除, 否则 clone 会冲突
           rm -rf "$HOME/theos/sdks"
           # 只拉取需要的 SDK (注意: theos/sdks 仓库最新只有 iPhoneOS16.5.sdk,
@@ -39,7 +40,6 @@ jobs:
           cd "$HOME/theos/sdks"
           git sparse-checkout set iPhoneOS16.5.sdk
           ls "$HOME/theos/sdks"
-          ls "$HOME/theos/toolchain/linux/iphone/bin" | head -5
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
       - name: Build package
