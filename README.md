@@ -27,3 +27,11 @@ make clean package FINALPACKAGE=1
 
 如果你使用 Relaxin/rootHide，而不是标准 Theos rootless，
 需要根据你的 GitHub 编译环境调整打包规则。
+
+## v1.0.1 修复
+
+修复 Xcode 15.4 / iOS 17.5 SDK 下 `UIApplication.windows`
+被标记为 deprecated、GitHub Actions 将 warning 当 error 导致的编译失败。
+
+现在通过 `UIWindowScene.windows` 枚举窗口，避免使用已弃用的
+`UIApplication.windows` API。
