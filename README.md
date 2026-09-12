@@ -1,111 +1,29 @@
-# ArcStatusBar
+# CustomStatusBar — iOS 17 / arm64e / rootless
 
-极简点阵状态栏越狱插件 —— 把 iOS 状态栏的信号 / WiFi / 电池图标替换为**点阵极简风格**：
+这是一个 Theos 工程，用于在 SpringBoard 中测试自定义状态栏 UI。
 
-- **信号** → 4 个圆点，按信号强度点亮
-- **WiFi** → 弧形 + 中心点，弧长随信号变化
-- **电池** → 细竖线 + 电量填充
-- 启动时播放一次「点阵 → 弧形」形变动画（对应视频中的加载效果）
+## 编译
 
-## 目标环境
-
-| 项目 | 要求 |
-|---|---|
-| 设备 | iPhone 14 Pro Max (A16, arm64e) |
-| 系统 | iOS 17.0 |
-| 越狱 | Relaxin (基于 RootHide / roothide, rootless) |
-| 包管理器 | Sileo |
-
-## 目录结构
-
-```
-ArcStatusBar/
-├── Makefile               # theos rootless 构建配置
-├── control                # deb 包信息
-├── Tweak.x                # hook 入口: _UIStatusBar*View
-├── ArcStatusBarViews.h/.m # 自定义点阵/弧形/线性视图 + 动画
-└── README.md
-```
-
-## 工作原理
-
-iOS 13+ 的状态栏是 `_UIStatusBar` 架构（UIKitCore 私有框架），每个图标是一个
-`_UIStatusBarItemView` 子类。**iOS 17 起状态栏整体改名为 `STUIStatusBar*` 系列**
-（参考已上架 roothide 的同类插件 CAiPhoneDuoStatus 的类名实证），电池类则一直
-是 `_UIBatteryView` / `_UIStaticBatteryView`（iOS 17 为 `STUIStatusBarStaticBatteryView`）。
-本插件对**两套类都 hook**（哪个存在哪个生效，互不干扰）：
-
-| 原生类（iOS 16 / iOS 17） | 作用 | 本插件替换为 |
-|---|---|---|
-| `_UIStatusBarCellularSignalView` / `STUIStatusBarCellularSignalView` | 蜂窝信号 | `ASBDotSignalView`（4 点） |
-| `_UIStatusBarWifiSignalView` / `STUIStatusBarWifiSignalView` | WiFi | `ASBArcWifiView`（弧形+点） |
-| `_UIBatteryView` `_UIStaticBatteryView` / `STUIStatusBarStaticBatteryView` | 电池 | `ASBLineBatteryView`（竖线） |
-
-做法：hook 上述类的 `layoutSubviews` → 隐藏原生图标层 → 挂上自定义
-`CAShapeLayer` 视图 → 通过 KVC 多 key（`numberOfActiveBars` / `_signalStrengthBars`，
-`chargePercent` / `capacity`）同步真实信号强度与电量；并 hook
-`STUIStatusBarForegroundView` / `_UIStatusBarForegroundView` 的 `setApplyingLayout:`
-做布局完成后的刷新兜底。未 hook 到（类名随 iOS 变化）时插件自动跳过，不影响系统。
-
-## 编译（GitHub Actions 自动构建, 推荐）
-
-把工程推到 GitHub 后, 仓库内置的 `.github/workflows/build.yml` 会在 macOS runner 上
-自动编译, 一次产出**两个包**:
-
-- `ArcStatusBar-rootless.deb` — 通用 rootless
-- `ArcStatusBar-roothide.deb` — **Relaxin / RootHide 环境装这个** (路径 /var/jb)
-
-去仓库 **Actions** 页 → 最新一次构建 → **Artifacts** 下载即可。
-
-## 编译（本地, macOS/Linux 均可）
-
-### 1. 安装 theos
+建议使用 Theos + rootless toolchain：
 
 ```bash
-git clone --recursive https://github.com/theos/theos.git ~/theos
-echo "export THEOS=~/theos" >> ~/.zshrc   # 或 ~/.bashrc
-source ~/.zshrc
+make clean package FINALPACKAGE=1
 ```
 
-### 2. 编译
+产物位于：
+`packages/`
 
-```bash
-cd ArcStatusBar
-make package
-```
+## 工程文件
 
-生成 `packages/com.doubao.arcstatusbar_0.1.0_iphoneos-arm64.deb`（`ARCHS=arm64 arm64e`，双架构）。
+- `Tweak.xm`：核心状态栏 UI
+- `CustomStatusBar.plist`：仅注入 SpringBoard
+- `Makefile`：iOS 17 / arm64e
+- `control`：Deb 包信息
 
-> 本工程**不链接** substrate/ellekit 库（roothide/theos 的 lib/ 目录为空，写
-> `_LIBRARIES = ellekit` / `substrate` 会报 `ld: library ... not found`）。
-> Logos %hook 符号由 Relaxin 内的 ellekit 运行时在设备端解析——这是
-> roothide tweak 的标准写法（如 ssl-kill-switch3、liquidass）。
+## 注意
 
-### 3. 安装到手机
+这是第一版 UI 测试工程，目前信号/Wi-Fi 图标属于自绘测试 UI，
+尚未替换成 Apple 私有框架中的实时状态数据。
 
-```bash
-make package install     # 需先 export THEOS_DEVICE_IP=手机IP, THEOS_DEVICE_PORT=22
-```
-
-或把 `.deb` 通过 Sileo / Filza 安装。安装后 **注销 (respring)** 生效。
-
-## 真机调试
-
-- 卸载: Sileo 中移除 ArcStatusBar 即可。
-- 日志: 设备上 `log stream --predicate 'process == "SpringBoard"'` 或
-  安装 `oslog` 查看。
-- 若图标没有变化：用 **FLEX** / `cycript` 检查真实类名（iOS 17 上应为
-  `STUIStatusBarCellularSignalView` 等），对比 `Tweak.x` 中的 hook 类名；
-  也可在设备日志里 grep `ArcStatusBar` 看注入是否成功（Sileo 安装后需 respring）。
-
-## 自定义
-
-- **图标颜色**：自动跟随状态栏前景色（`tintColor`），浅色/深色壁纸自适应。
-- **动画开关**：删除 `Tweak.x` 中 `%hook SpringBoard` 一段可关闭启动动画。
-- **信号样式**：改 `ArcStatusBarViews.m` 中点的直径/间距/数量。
-
-## 风险提示
-
-- 越狱插件有系统级风险，安装前建议先备份（设置-通用-传输或还原）。
-- 仅在你自己的设备上使用；部分 App 可能有越狱检测，Relaxin 的 RootHide
-  环境已内置屏蔽能力，但个别检测严格的 App 仍可能受影响。
+如果你使用 Relaxin/rootHide，而不是标准 Theos rootless，
+需要根据你的 GitHub 编译环境调整打包规则。
