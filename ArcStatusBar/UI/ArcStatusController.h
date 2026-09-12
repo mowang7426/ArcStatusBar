@@ -1,13 +1,12 @@
 #import <UIKit/UIKit.h>
 
-@class ArcMorphView;
+@class ArcBarView;
 
 @interface ArcStatusController : NSObject
 @property (nonatomic, strong, readonly) UIWindow *window;
-@property (nonatomic, strong, readonly) ArcMorphView *morphView;
+@property (nonatomic, strong, readonly) ArcBarView *barView;
 
 - (void)start;
 - (void)stop;
-- (void)toggleDemo;
 
 @end
