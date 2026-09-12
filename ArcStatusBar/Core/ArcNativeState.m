@@ -1,6 +1,21 @@
 #import "ArcNativeState.h"
 #import <math.h>
 
+// 递归收集宿主树中所有原生图标视图 (信号/WiFi/电池/5G 可能在深层子视图)
+static void ASB_CollectTargets(UIView *root, NSMutableArray<UIView *> *outArr) {
+    for (UIView *v in root.subviews) {
+        NSString *cls = NSStringFromClass(v.class);
+        if ([cls containsString:@"Signal"] ||
+            [cls containsString:@"Wifi"] ||
+            [cls containsString:@"WiFi"] ||
+            [cls containsString:@"Battery"] ||
+            [cls containsString:@"NetworkType"]) {
+            [outArr addObject:v];
+        }
+        ASB_CollectTargets(v, outArr);
+    }
+}
+
 @implementation ArcNativeState
 
 + (instancetype)sharedState {
@@ -11,6 +26,9 @@
         state.backgroundColor = UIColor.clearColor;
         state.userInteractionEnabled = NO;
         state.contentMode = UIViewContentModeRedraw;
+        // 默认值兜底: 即使数据 setter 未触发也显示满格/满电
+        state.activeBars = 4;
+        state.chargePercent = 100;
     });
     return state;
 }
@@ -74,22 +92,28 @@
     UIView *host = self.superview;
     if (!ctx || !host) return;
 
-    // 优先用 frame setter 记录的精确位置; 未记录时回退到视图树转换
-    CGRect sf = [self resolvedFrameForView:self.signalView cached:self.signalFrame host:host];
-    CGRect wf = [self resolvedFrameForView:self.wifiView cached:self.wifiFrame host:host];
-    CGRect bf = [self resolvedFrameForView:self.batteryView cached:self.batteryFrame host:host];
+    // 实时递归定位原生图标 (不依赖任何 frame setter, 保证位置永远正确)
+    NSMutableArray<UIView *> *targets = [NSMutableArray array];
+    ASB_CollectTargets(host, targets);
 
-    if (!CGRectIsEmpty(sf) && !CGRectIsNull(sf)) [self drawSignalDots:ctx frame:sf];
-    if (!CGRectIsEmpty(wf) && !CGRectIsNull(wf)) [self drawWifiArc:ctx frame:wf];
-    if (!CGRectIsEmpty(bf) && !CGRectIsNull(bf)) [self drawBattery:ctx frame:bf];
-}
-
-- (CGRect)resolvedFrameForView:(UIView *)view cached:(CGRect)cached host:(UIView *)host {
-    if (view && view.superview) {
-        CGRect f = [host convertRect:view.bounds fromView:view];
-        if (!CGRectIsNull(f) && !CGRectIsEmpty(f)) return f;
+    CGRect sf = CGRectNull, wf = CGRectNull, bf = CGRectNull;
+    for (UIView *v in targets) {
+        NSString *c = NSStringFromClass(v.class);
+        // 5G 标签不绘制
+        if ([c containsString:@"NetworkType"]) continue;
+        // 注意顺序: "WifiSignalView" 同时含 Wifi 和 Signal, 必须优先判 WiFi
+        if ([c containsString:@"Wifi"] || [c containsString:@"WiFi"]) {
+            if (CGRectIsNull(wf)) wf = [self convertRect:v.bounds fromView:v];
+        } else if ([c containsString:@"Battery"]) {
+            if (CGRectIsNull(bf)) bf = [self convertRect:v.bounds fromView:v];
+        } else if ([c containsString:@"Signal"]) {
+            if (CGRectIsNull(sf)) sf = [self convertRect:v.bounds fromView:v];
+        }
     }
-    return cached;
+
+    if (!CGRectIsNull(sf)) [self drawSignalDots:ctx frame:sf];
+    if (!CGRectIsNull(wf)) [self drawWifiArc:ctx frame:wf];
+    if (!CGRectIsNull(bf)) [self drawBattery:ctx frame:bf];
 }
 
 // 信号: 4 个白点, 点亮数量 = activeBars
