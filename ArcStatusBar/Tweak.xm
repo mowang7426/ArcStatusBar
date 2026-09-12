@@ -79,6 +79,9 @@ static void ASB_LOG_HIT(NSString *what) {
     }
 }
 
+// 前置声明: ASB_ShowBanner 定义在文件后部, 供前面函数调用
+static void ASB_ShowBanner(NSString *msg);
+
 // 递归隐藏宿主树中所有原生图标 (信号/WiFi/电池/5G 标签可能在深层子视图)
 static void ASB_HideTargets(UIView *root) {
     for (UIView *v in root.subviews) {
