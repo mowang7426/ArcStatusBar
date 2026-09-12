@@ -23,11 +23,12 @@ ArcStatusBar_FILES = Tweak.x ArcStatusBarViews.m
 ArcStatusBar_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
 
 # -----------------------------------------------------------------------------
-# 不链接任何 hook 库 (不写 LIBRARIES):
-# roothide/theos 的 lib/ 目录为空, 不提供 ellekit.tbd / libsubstrate.tbd,
-# 写 -lellekit 或 -lsubstrate 都会报 ld: library not found。
-# Logos %hook 生成的 MSHookMessageEx 等符号由 Relaxin 内的 ellekit 运行时
-# 在设备端解析 (参考 ssl-kill-switch3 等 roothide tweak 的标准写法)。
+# 链接 substrate —— roothide/theos 在 roothide scheme 下会自动把 -lsubstrate
+# 转成 @loader_path/.jbroot/usr/lib/libsubstrate.dylib (参考已在 Relaxin 正常
+# 工作的同类插件 CAiPhoneDuoStatus 的二进制依赖实证)。ellekit 在越狱环境提供
+# libsubstrate.dylib (符号链接), 加载期解析 MSHookMessageEx 等符号。
+# 不要改成 ellekit (roothide/theos 无 ellekit.tbd, 会报 ld: library 'ellekit' not found)。
 # -----------------------------------------------------------------------------
+ArcStatusBar_LIBRARIES = substrate
 
 include $(THEOS_MAKE_PATH)/tweak.mk

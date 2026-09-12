@@ -1,9 +1,9 @@
 Package: com.doubao.arcstatusbar
 Name: ArcStatusBar
-Version: 0.1.0
-Architecture: iphoneos-arm64
+Version: 0.1.1
+Architecture: iphoneos-arm64e
 Description: 极简点阵状态栏 —— 4点信号 + 弧形WiFi + 线性电池 + 加载形变动画 (iOS 17 / RootHide)
-Depends: mobilesubstrate (>= 0.9.5000)
+Depends: firmware (>= 16.0)
 Maintainer: Doubao
 Author: Doubao
 Section: Tweaks
