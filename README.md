@@ -1,6 +1,10 @@
-# ArcStatusBar v2.1
+# ArcStatusBar v2.1.1
 
 iOS 17 / arm64e / rootless Theos project.
+
+## v2.1.1 changes
+
+- Fixed the iOS 17 SDK `UIScene *` → `UIWindowScene *` incompatible-pointer build error.
 
 ## v2.1 changes
 
