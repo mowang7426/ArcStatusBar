@@ -97,21 +97,29 @@ static void ASB_HideTargets(UIView *root) {
     }
 }
 
-// 向上找状态栏根容器 (含 StatusBar 且非 Foreground/Item 的视图)
+// 向上找状态栏根容器: 从父视图上溯, 取最顶层含 StatusBar 的视图
+// (跳过 Item/Display/Foreground/Window, 避免挂到隐藏的图标视图或窗口上)
 static UIView *ASB_FindStatusBarContainer(UIView *v) {
-    UIView *cur = v;
-    UIView *last = v;
+    UIView *cur = v.superview; // 从父视图开始, 跳过 self
+    UIView *best = nil;
     while (cur) {
         NSString *c = NSStringFromClass(cur.class);
         if ([c containsString:@"StatusBar"] &&
             ![c containsString:@"Foreground"] &&
-            ![c containsString:@"Item"]) {
-            return cur;
+            ![c containsString:@"Item"] &&
+            ![c containsString:@"Display"] &&
+            ![c containsString:@"Window"]) {
+            best = cur;
         }
-        last = cur;
         cur = cur.superview;
     }
-    return last;
+    if (!best) {
+        // 回退: 上溯到最顶层视图
+        cur = v.superview;
+        while (cur && cur.superview) cur = cur.superview;
+        best = cur;
+    }
+    return best;
 }
 
 // 挂载 + 递归隐藏 + 重绘 (异步, 不在 setter 调用栈内动视图层级)
