@@ -1,8 +1,8 @@
 Package: com.luochencustom.arcstatusbar
 Name: ArcStatusBar
-Version: 2.0.0
+Version: 2.1.0
 Architecture: iphoneos-arm64
-Description: Morphing arc-style status bar prototype for iOS 17.
+Description: Wi-Fi arc morph status bar for iOS 17.
 Maintainer: Luochencustom
 Author: Luochencustom
 Section: Tweaks
