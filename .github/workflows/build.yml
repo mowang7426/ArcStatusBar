@@ -1,7 +1,7 @@
 name: Build ArcStatusBar
 
-# 触发: 修改代码时 / 手动触发(仓库 Actions 页面点 Run workflow)
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'Tweak.x'
@@ -9,53 +9,90 @@ on:
       - 'ArcStatusBarViews.m'
       - 'Makefile'
       - 'control'
-  workflow_dispatch:
+      - 'Filter.plist'
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-14
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential fakeroot rsync curl perl zip git libxml2 libtinfo6
-          # theos 在 Linux 上打包需要 ldid (Procursus 版, 支持 arm64e 签名)
-          curl -sL https://github.com/ProcursusTeam/ldid/releases/latest/download/ldid_linux_x86_64 -o /usr/local/bin/ldid
-          chmod +x /usr/local/bin/ldid
+          brew install make dpkg ldid xz
 
-      - name: Setup theos
+      - name: Set THEOS
         run: |
-          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          # Linux iOS 交叉工具链 (theos 官方 install-theos 同源, 非 Swift 版;
-          # 解压到 $THEOS/toolchain/, 包内顶层是 linux/)
-          curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz | tar -xJvf - -C "$HOME/theos/toolchain/"
-          test -x "$HOME/theos/toolchain/linux/iphone/bin/clang" && echo "toolchain OK" || (echo "toolchain FAILED"; exit 7)
-          # theos 自带一个空的 sdks 目录, 必须先移除, 否则 clone 会冲突
-          rm -rf "$HOME/theos/sdks"
-          # 只拉取需要的 SDK (注意: theos/sdks 仓库最新只有 iPhoneOS16.5.sdk,
-          # 没有 17.x, 但 16.5 SDK 已包含 _UIStatusBar 全套私有符号, 可正常编译)
-          git clone --depth 1 --filter=blob:none --sparse https://github.com/theos/sdks.git "$HOME/theos/sdks"
-          cd "$HOME/theos/sdks"
-          git sparse-checkout set iPhoneOS16.5.sdk
-          ls "$HOME/theos/sdks"
-          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "THEOS_MAKE_PATH=$HOME/theos/makefiles" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: Build package
+      - name: Install RootHide Theos
+        run: |
+          rm -rf "$HOME/theos"
+          git clone --recursive https://github.com/roothide/theos.git "$HOME/theos"
+
+      - name: Install iPhoneOS 16.5 SDK
+        run: |
+          set -e
+          rm -rf /tmp/theos-sdks
+          mkdir -p "$HOME/theos/sdks"
+          git clone --depth=1 --filter=blob:none --sparse https://github.com/theos/sdks.git /tmp/theos-sdks
+          cd /tmp/theos-sdks
+          git sparse-checkout set iPhoneOS16.5.sdk
+          cp -R "iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
+
+      - name: Verify Theos environment
+        run: |
+          set -e
+          echo "THEOS=$THEOS"
+          echo "THEOS_MAKE_PATH=$THEOS_MAKE_PATH"
+          test -f "$THEOS/makefiles/common.mk"
+          test -f "$THEOS/makefiles/tweak.mk"
+          test -f "$THEOS/makefiles/aggregate.mk"
+
+      - name: Verify package metadata
+        run: |
+          set -e
+          grep -E '^(Package|Name|Version|Depends):' control
+
+      - name: Prepare build directory
+        run: |
+          rm -rf build
+          mkdir -p build
+
+      - name: Build Rootless
+        run: |
+          set -e
+          make clean || true
+          THEOS_PACKAGE_SCHEME=rootless make package FINALPACKAGE=1
+
+      - name: Copy Rootless package
+        run: |
+          set -e
+          ROOTLESS_DEB=$(find packages -maxdepth 1 -type f -name "*.deb" | head -n 1)
+          cp "$ROOTLESS_DEB" "build/ArcStatusBar-rootless.deb"
+
+      - name: Clean before RootHide
         run: |
           make clean || true
-          make package
+          rm -rf packages
 
-      - name: Upload deb artifact
+      - name: Build RootHide
+        run: |
+          set -e
+          THEOS_PACKAGE_SCHEME=roothide make package FINALPACKAGE=1
+
+      - name: Copy RootHide package
+        run: |
+          set -e
+          ROOTHIDE_DEB=$(find packages -maxdepth 1 -type f -name "*.deb" | head -n 1)
+          cp "$ROOTHIDE_DEB" "build/ArcStatusBar-roothide.deb"
+
+      - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: ArcStatusBar-deb
-          path: packages/*.deb
-
-      # 打 tag 推上去时, 自动把 deb 挂到 Release
-      - name: Attach deb to Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: packages/*.deb
+          name: ArcStatusBar-debs
+          path: build/*.deb
